@@ -1,13 +1,18 @@
-// 🌟 BFS Visualizer X – All-in-One Interactive Version (Corrected Full Code with Fixes)
-
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
 import javax.swing.*;
 
-// 🌟 BFS Visualizer X – Enhanced Version with Node Selection Highlight and Edge Styling
-
+// 🌟 BFS Visualizer X – Enhanced Version with Node Selection Highlight, Edge Styling, Delete Node, and Undo
 
 public class ModernBfsGui extends JFrame {
     private final GraphCanvas canvas = new GraphCanvas();
@@ -30,9 +35,8 @@ public class ModernBfsGui extends JFrame {
 
         JButton bfsBtn = new JButton("Start BFS");
         JButton resetBtn = new JButton("Reset Graph");
-        JCheckBox darkModeToggle = new JCheckBox("Dark Mode");
-        darkModeToggle.setForeground(Color.WHITE);
-        darkModeToggle.setBackground(new Color(40, 40, 70));
+        JButton deleteNodeBtn = new JButton("Delete Node");
+        JButton undoBtn = new JButton("Undo");
 
         topPanel.add(sourceLabel);
         topPanel.add(sourceField);
@@ -40,7 +44,8 @@ public class ModernBfsGui extends JFrame {
         topPanel.add(destField);
         topPanel.add(bfsBtn);
         topPanel.add(resetBtn);
-        topPanel.add(darkModeToggle);
+        topPanel.add(deleteNodeBtn);
+        topPanel.add(undoBtn);
 
         bfsBtn.addActionListener(e -> {
             String src = sourceField.getText().trim();
@@ -60,15 +65,32 @@ public class ModernBfsGui extends JFrame {
             destField.setText("");
         });
 
-        darkModeToggle.addActionListener(e -> canvas.setDarkMode(darkModeToggle.isSelected()));
+        deleteNodeBtn.addActionListener(e -> {
+            String nodeName = JOptionPane.showInputDialog("Enter node name to delete:");
+            if (nodeName != null && !nodeName.trim().isEmpty()) {
+                canvas.deleteNode(nodeName.trim());
+            }
+        });
 
-        JTextArea bfsOutput = new JTextArea();
-        bfsOutput.setEditable(false);
-        bfsOutput.setFont(new Font("Consolas", Font.PLAIN, 13));
-        bfsOutput.setBackground(new Color(240, 240, 240));
-        JScrollPane rightScroll = new JScrollPane(bfsOutput);
-        rightScroll.setPreferredSize(new Dimension(300, getHeight()));
-        canvas.setOutputArea(bfsOutput);
+        undoBtn.addActionListener(e -> canvas.undoDelete());
+
+        Color lightSkyBlue = new Color(209, 230, 250); // Very light sky blue
+
+MessagePanel messagePanel = new MessagePanel();
+messagePanel.setBackground(lightSkyBlue); // Message panel background
+
+JScrollPane rightScroll = new JScrollPane(messagePanel);
+rightScroll.setPreferredSize(new Dimension(300, getHeight()));
+
+// Set background for scroll pane and its viewport
+rightScroll.setBackground(lightSkyBlue);
+rightScroll.getViewport().setBackground(lightSkyBlue);
+
+canvas.setOutputPanel(messagePanel);
+
+
+canvas.setOutputPanel(messagePanel);
+
 
         add(topPanel, BorderLayout.NORTH);
         add(rightScroll, BorderLayout.EAST);
@@ -86,18 +108,19 @@ class GraphCanvas extends JPanel {
     private final Map<String, List<Edge>> adjacencyList = new HashMap<>();
     private final List<Node> visitedNodes = new ArrayList<>();
     private final List<Edge> pathEdges = new ArrayList<>();
-    private JTextArea outputArea;
+    private MessagePanel outputPanel;
     private Node draggingNode = null;
     private Point dragOffset = null;
     private Node selectedForEdge = null;
     private Node sourceNode = null;
     private Node destinationNode = null;
     private int nodeCounter = 0;
-    private boolean darkMode = true;
     private final Image bgImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/WORLD.jpg"))).getImage();
+    private Node lastDeletedNode = null;
+    private List<Edge> lastDeletedEdges = new ArrayList<>();
 
     public GraphCanvas() {
-        setBackground(new Color(30, 30, 60));
+        setBackground(Color.WHITE); // Default to light mode
 
         addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
@@ -115,7 +138,6 @@ class GraphCanvas extends JPanel {
                 dragOffset = null;
             }
 
-            // Inside GraphCanvas class (within mouseClicked event handler):
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) return;
                 Node clicked = getNodeAt(e.getPoint());
@@ -126,7 +148,6 @@ class GraphCanvas extends JPanel {
                         String weightStr = JOptionPane.showInputDialog("Enter edge weight:");
                         try {
                             int weight = Integer.parseInt(weightStr);
-                            // 🔧 NEW: Check for negative weight
                             if (weight < 0) {
                                 JOptionPane.showMessageDialog(null, "Negative weights are not allowed in BFS.");
                                 selectedForEdge = null;
@@ -138,14 +159,12 @@ class GraphCanvas extends JPanel {
                         }
                         selectedForEdge = null;
                     } else {
-                        // 🔧 NEW: Check for self-loop
                         JOptionPane.showMessageDialog(null, "Self-loops are not allowed.");
                         selectedForEdge = null;
                     }
                 }
                 repaint();
             }
-
         });
 
         addMouseMotionListener(new MouseMotionAdapter() {
@@ -159,14 +178,8 @@ class GraphCanvas extends JPanel {
         });
     }
 
-    public void setDarkMode(boolean enabled) {
-        this.darkMode = enabled;
-        setBackground(enabled ? new Color(30, 30, 60) : Color.WHITE);
-        repaint();
-    }
-
-    public void setOutputArea(JTextArea area) {
-        this.outputArea = area;
+    public void setOutputPanel(MessagePanel panel) {
+        this.outputPanel = panel;
     }
 
     public void setSource(String name) {
@@ -185,8 +198,60 @@ class GraphCanvas extends JPanel {
         destinationNode = null;
         visitedNodes.clear();
         pathEdges.clear();
-        if (outputArea != null) outputArea.setText("");
+        adjacencyList.clear();
+        lastDeletedNode = null;
+        lastDeletedEdges.clear();
+        nodeCounter = 0; // Reset nodeCounter to start labeling from 'A' again
+        if (outputPanel != null) outputPanel.clearMessages();
         repaint();
+    }
+
+    public void deleteNode(String nodeName) {
+        Node nodeToDelete = getNodeByName(nodeName);
+        if (nodeToDelete == null) {
+            JOptionPane.showMessageDialog(null, "Node " + nodeName + " not found.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        lastDeletedNode = nodeToDelete;
+        lastDeletedEdges.clear();
+        for (Edge e : edges) {
+            if (e.from == nodeToDelete || e.to == nodeToDelete) {
+                lastDeletedEdges.add(e);
+            }
+        }
+
+        nodes.remove(nodeToDelete);
+        edges.removeIf(e -> e.from == nodeToDelete || e.to == nodeToDelete);
+        updateAdjacencyList();
+
+        if (sourceNode == nodeToDelete) sourceNode = null;
+        if (destinationNode == nodeToDelete) destinationNode = null;
+        if (selectedForEdge == nodeToDelete) selectedForEdge = null;
+
+        if (outputPanel != null) {
+            outputPanel.addMessage("Node " + nodeName + " deleted.");
+        }
+        repaint();
+    }
+
+    public void undoDelete() {
+        if (lastDeletedNode == null) {
+            JOptionPane.showMessageDialog(null, "No node deletion to undo.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        nodes.add(lastDeletedNode);
+        edges.addAll(lastDeletedEdges);
+        updateAdjacencyList();
+
+        if (outputPanel != null) {
+            outputPanel.addMessage("Undo: Restored node " + lastDeletedNode.name + " and its edges.");
+        }
+        repaint();
+
+        lastDeletedNode = null;
+        lastDeletedEdges.clear();
     }
 
     private void addNode(int x, int y) {
@@ -209,8 +274,6 @@ class GraphCanvas extends JPanel {
         return null;
     }
 
-    // Inside startBFS() method (additions marked):
-
     public void startBFS() {
         if (sourceNode == null || destinationNode == null) {
             JOptionPane.showMessageDialog(null, "Invalid source or destination node.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -226,13 +289,13 @@ class GraphCanvas extends JPanel {
         queue.add(sourceNode);
         visited.add(sourceNode);
 
-        if (outputArea != null) {
-            outputArea.append("Starting BFS from " + sourceNode.name + " to " + destinationNode.name + "\n");
+        if (outputPanel != null) {
+            outputPanel.addMessage("Starting BFS from " + sourceNode.name + " to " + destinationNode.name);
         }
 
         while (!queue.isEmpty()) {
             Node current = queue.poll();
-            if (outputArea != null) outputArea.append("Visiting: " + current.name + "\n");
+            if (outputPanel != null) outputPanel.addMessage("Visiting: " + current.name);
             visitedNodes.add(current);
             repaint();
             try {
@@ -250,22 +313,18 @@ class GraphCanvas extends JPanel {
                     visited.add(neighbor);
                     parent.put(neighbor, current);
                     queue.add(neighbor);
-
-                    // 🔧 NEW: Logging routing decisions
-                    if (outputArea != null) {
-                        assert neighbor != null;
-                        outputArea.append("Enqueueing: " + neighbor.name + " (parent: " + current.name + ")\n");
+                    if (outputPanel != null) {
+                        outputPanel.addMessage("Enqueueing: " + neighbor.name + " (parent: " + current.name + ")");
                     }
                 }
             }
         }
 
-        if (outputArea != null)
-            outputArea.append("No path found from " + sourceNode.name + " to " + destinationNode.name + "\n");
+        if (outputPanel != null)
+            outputPanel.addMessage("No path found from " + sourceNode.name + " to " + destinationNode.name);
 
         JOptionPane.showMessageDialog(null, "No path found from " + sourceNode.name + " to " + destinationNode.name);
     }
-
 
     private void updateAdjacencyList() {
         adjacencyList.clear();
@@ -296,8 +355,8 @@ class GraphCanvas extends JPanel {
         }
         StringBuilder msg = new StringBuilder("Shortest path: ");
         for (Node n : path) msg.append(n.name).append(" -> ");
-        if (outputArea != null)
-            outputArea.append("\nBest path found: " + msg.substring(0, msg.length() - 4));
+        if (outputPanel != null)
+            outputPanel.addMessage("Best path found: " + msg.substring(0, msg.length() - 4));
         repaint();
     }
 
@@ -313,10 +372,10 @@ class GraphCanvas extends JPanel {
         for (Edge e : edges) {
             if (pathEdges.contains(e)) {
                 g2.setColor(Color.RED);
-                g2.setStroke(new BasicStroke(4));
+                g2.setStroke(new BasicStroke(3));
             } else {
                 g2.setColor(Color.BLACK);
-                g2.setStroke(new BasicStroke(3));
+                g2.setStroke(new BasicStroke(2));
             }
             g2.drawLine(e.from.x, e.from.y, e.to.x, e.to.y);
 
@@ -336,9 +395,9 @@ class GraphCanvas extends JPanel {
 
         for (Node n : nodes) {
             if (visitedNodes.contains(n)) {
-                g2.setColor(Color.ORANGE);
+                g2.setColor(Color.ORANGE); // Nodes turn orange when visited
             } else {
-                g2.setColor(darkMode ? Color.pink : new Color(100, 149, 237));
+                g2.setColor(Color.PINK); // Set node color to pink
             }
             g2.fillOval(n.x - n.r, n.y - n.r, 2 * n.r, 2 * n.r);
 
@@ -394,4 +453,93 @@ class Edge {
     }
 }
 
+// Updated class for custom message panel
+class MessagePanel extends JPanel {
+    private final List<String> messages = new ArrayList<>();
+    private static final Color DEFAULT_BORDER_COLOR = new Color(128, 0, 128); // Purple border
+    private static final Color PATH_FOUND_BORDER_COLOR = new Color(75, 0, 130); // Darker purple for "Best path found"
+    private static final int ARC_SIZE = 20; // Rounded corners
+    private static final int MARGIN = 10;
 
+    public MessagePanel() {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setBackground(new Color(240, 240, 240));
+    }
+
+    public void addMessage(String message) {
+        if (messages.isEmpty() || !isSimilarMessage(messages.get(messages.size() - 1), message)) {
+            messages.add(message);
+        } else {
+            // Append to the last message with a newline
+            int lastIndex = messages.size() - 1;
+            messages.set(lastIndex, messages.get(lastIndex) + "\n" + message);
+        }
+        repaint();
+        revalidate();
+    }
+
+    public void clearMessages() {
+        messages.clear();
+        repaint();
+        revalidate();
+    }
+
+    private boolean isSimilarMessage(String msg1, String msg2) {
+        // Check if messages start with the same prefix (e.g., "Visiting:", "Enqueueing:")
+        String[] prefixes = {"Visiting:", "Enqueueing:"};
+        for (String prefix : prefixes) {
+            if (msg1.startsWith(prefix) && msg2.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        int y = MARGIN;
+        FontMetrics fm = g2.getFontMetrics(getFont());
+        int lineHeight = fm.getHeight() + 10;
+
+        for (String message : messages) {
+            int width = fm.stringWidth(message.replace("\n", " ")) + 40; // Account for longest line
+            int height = (message.split("\n").length * lineHeight) + 10;
+
+            // Determine border color based on message type
+            Color borderColor = message.startsWith("Best path found:") ? PATH_FOUND_BORDER_COLOR : DEFAULT_BORDER_COLOR;
+
+            // Draw rounded rectangle with purple border
+            g2.setColor(borderColor);
+            g2.setStroke(new BasicStroke(2));
+            g2.drawRoundRect(MARGIN, y, width, height, ARC_SIZE, ARC_SIZE);
+
+            // Fill with a light background
+            g2.setColor(new Color(230, 230, 250)); // Light lavender background
+            g2.fillRoundRect(MARGIN + 1, y + 1, width - 2, height - 2, ARC_SIZE, ARC_SIZE);
+
+            // Draw the text with newlines
+            g2.setColor(Color.BLACK);
+            String[] lines = message.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                g2.drawString(lines[i], MARGIN + 20, y + (i + 1) * lineHeight - 5);
+            }
+
+            y += height + MARGIN;
+        }
+    }
+
+    @Override
+    public Dimension getPreferredSize() {
+        FontMetrics fm = getFontMetrics(getFont());
+        int maxWidth = 0;
+        for (String message : messages) {
+            int width = fm.stringWidth(message.replace("\n", " ")) + 60; // Padding for longest line
+            maxWidth = Math.max(maxWidth, width);
+        }
+        return new Dimension(maxWidth, messages.size() * (fm.getHeight() + 20) + MARGIN);
+    }
+}
