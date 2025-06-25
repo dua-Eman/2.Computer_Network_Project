@@ -91,12 +91,14 @@ public class ModernBfsGui extends JFrame {
 
         directedGraphCheckBox.addActionListener(e -> canvas.setDirected(directedGraphCheckBox.isSelected()));
 
+        // In ModernBfsGui constructor
         Color lightSkyBlue = new Color(209, 230, 250);
         messagePanel.setBackground(lightSkyBlue);
-        rightScroll = new JScrollPane(messagePanel);
+        rightScroll = new JScrollPane(messagePanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         rightScroll.setPreferredSize(new Dimension(350, getHeight()));
         rightScroll.setBackground(lightSkyBlue);
         rightScroll.getViewport().setBackground(lightSkyBlue);
+        rightScroll.setBorder(BorderFactory.createEmptyBorder()); // Optional: Remove border for cleaner look
 
         canvas.setOutputPanel(messagePanel);
 
@@ -579,6 +581,7 @@ class MessagePanel extends JPanel {
     private static final Color PAPER_PATH_FOUND_BORDER_COLOR = new Color(101, 67, 33);
     private static final int ARC_SIZE = 20;
     private static final int MARGIN = 10;
+    private static final int PADDING = 10;
     private boolean isPaperView = false;
 
     public MessagePanel() {
@@ -600,16 +603,24 @@ class MessagePanel extends JPanel {
                 int lastIndex = messages.size() - 1;
                 messages.set(lastIndex, messages.get(lastIndex) + "\n" + message);
             }
-            repaint();
             revalidate();
+            repaint();
+            // Auto-scroll to the bottom
+            SwingUtilities.invokeLater(() -> {
+                JScrollPane scrollPane = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, this);
+                if (scrollPane != null) {
+                    JScrollBar vertical = scrollPane.getVerticalScrollBar();
+                    vertical.setValue(vertical.getMaximum());
+                }
+            });
         });
     }
 
     public void clearMessages() {
         SwingUtilities.invokeLater(() -> {
             messages.clear();
-            repaint();
             revalidate();
+            repaint();
         });
     }
 
@@ -628,14 +639,20 @@ class MessagePanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setFont(getFont());
 
         int y = MARGIN;
-        FontMetrics fm = g2.getFontMetrics(getFont());
-        int lineHeight = fm.getHeight() + 10;
+        FontMetrics fm = g2.getFontMetrics();
+        int lineHeight = fm.getHeight() + PADDING;
 
         for (String message : messages) {
-            int width = fm.stringWidth(message.replace("\n", " ")) + 40;
-            int height = (message.split("\n").length * lineHeight) + 10;
+            String[] lines = message.split("\n");
+            int maxWidth = 0;
+            for (String line : lines) {
+                maxWidth = Math.max(maxWidth, fm.stringWidth(line));
+            }
+            int width = maxWidth + 40;
+            int height = (lines.length * lineHeight) + PADDING;
 
             Color borderColor = message.startsWith("Best path found:") ?
                     (isPaperView ? PAPER_PATH_FOUND_BORDER_COLOR : PATH_FOUND_BORDER_COLOR) :
@@ -649,7 +666,6 @@ class MessagePanel extends JPanel {
             g2.fillRoundRect(MARGIN + 1, y + 1, width - 2, height - 2, ARC_SIZE, ARC_SIZE);
 
             g2.setColor(Color.BLACK);
-            String[] lines = message.split("\n");
             for (int i = 0; i < lines.length; i++) {
                 g2.drawString(lines[i], MARGIN + 20, y + (i + 1) * lineHeight - 5);
             }
@@ -662,10 +678,22 @@ class MessagePanel extends JPanel {
     public Dimension getPreferredSize() {
         FontMetrics fm = getFontMetrics(getFont());
         int maxWidth = 0;
+        int totalHeight = MARGIN;
+
         for (String message : messages) {
-            int width = fm.stringWidth(message.replace("\n", " ")) + 60;
-            maxWidth = Math.max(maxWidth, width);
+            String[] lines = message.split("\n");
+            int messageWidth = 0;
+            for (String line : lines) {
+                messageWidth = Math.max(messageWidth, fm.stringWidth(line));
+            }
+            maxWidth = Math.max(maxWidth, messageWidth + 60);
+            totalHeight += (lines.length * (fm.getHeight() + PADDING)) + PADDING + MARGIN;
         }
-        return new Dimension(maxWidth, messages.size() * (fm.getHeight() + 20) + MARGIN);
+
+        // Ensure minimum width and height
+        maxWidth = Math.max(maxWidth, 300);
+        totalHeight = Math.max(totalHeight, 100);
+
+        return new Dimension(maxWidth, totalHeight);
     }
 }
