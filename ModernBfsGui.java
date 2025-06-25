@@ -1,3 +1,4 @@
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
@@ -12,16 +13,18 @@ import java.util.Queue;
 import java.util.Set;
 import javax.swing.*;
 
-// 🌟 BFS Visualizer X – Enhanced Version with Node Selection Highlight, Edge Styling, Delete Node, and Undo
+// 🌟 BFS Visualizer X – Enhanced Version with Directed Edges, Node/Edge Logging, and Robust Image Loading
 
 public class ModernBfsGui extends JFrame {
     private final GraphCanvas canvas = new GraphCanvas();
     private final JTextField sourceField = new JTextField(5);
     private final JTextField destField = new JTextField(5);
+    private final MessagePanel messagePanel = new MessagePanel();
+    private final JScrollPane rightScroll;
 
     public ModernBfsGui() {
         setTitle("BFS Visualizer X - Final");
-        setSize(1000, 700);
+        setSize(1200, 700);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
@@ -37,6 +40,10 @@ public class ModernBfsGui extends JFrame {
         JButton resetBtn = new JButton("Reset Graph");
         JButton deleteNodeBtn = new JButton("Delete Node");
         JButton undoBtn = new JButton("Undo");
+        JButton toggleViewBtn = new JButton("Paper View");
+        JCheckBox directedGraphCheckBox = new JCheckBox("Directed Graph", false);
+        directedGraphCheckBox.setToolTipText("Toggle between directed and undirected edges");
+        directedGraphCheckBox.setForeground(Color.black);
 
         topPanel.add(sourceLabel);
         topPanel.add(sourceField);
@@ -46,6 +53,8 @@ public class ModernBfsGui extends JFrame {
         topPanel.add(resetBtn);
         topPanel.add(deleteNodeBtn);
         topPanel.add(undoBtn);
+        topPanel.add(toggleViewBtn);
+        topPanel.add(directedGraphCheckBox);
 
         bfsBtn.addActionListener(e -> {
             String src = sourceField.getText().trim();
@@ -74,27 +83,35 @@ public class ModernBfsGui extends JFrame {
 
         undoBtn.addActionListener(e -> canvas.undoDelete());
 
-        Color lightSkyBlue = new Color(209, 230, 250); // Very light sky blue
+        toggleViewBtn.addActionListener(e -> {
+            canvas.toggleBackgroundImage();
+            toggleViewBtn.setText(canvas.isPaperView() ? "World Map" : "Paper View");
+            updateMessagePanelColors();
+        });
 
-MessagePanel messagePanel = new MessagePanel();
-messagePanel.setBackground(lightSkyBlue); // Message panel background
+        directedGraphCheckBox.addActionListener(e -> canvas.setDirected(directedGraphCheckBox.isSelected()));
 
-JScrollPane rightScroll = new JScrollPane(messagePanel);
-rightScroll.setPreferredSize(new Dimension(300, getHeight()));
+        Color lightSkyBlue = new Color(209, 230, 250);
+        messagePanel.setBackground(lightSkyBlue);
+        rightScroll = new JScrollPane(messagePanel);
+        rightScroll.setPreferredSize(new Dimension(350, getHeight()));
+        rightScroll.setBackground(lightSkyBlue);
+        rightScroll.getViewport().setBackground(lightSkyBlue);
 
-// Set background for scroll pane and its viewport
-rightScroll.setBackground(lightSkyBlue);
-rightScroll.getViewport().setBackground(lightSkyBlue);
-
-canvas.setOutputPanel(messagePanel);
-
-
-canvas.setOutputPanel(messagePanel);
-
+        canvas.setOutputPanel(messagePanel);
 
         add(topPanel, BorderLayout.NORTH);
         add(rightScroll, BorderLayout.EAST);
         add(canvas, BorderLayout.CENTER);
+    }
+
+    private void updateMessagePanelColors() {
+        Color backgroundColor = canvas.isPaperView() ? new Color(210, 180, 140) : new Color(209, 230, 250);
+        messagePanel.setBackground(backgroundColor);
+        rightScroll.setBackground(backgroundColor);
+        rightScroll.getViewport().setBackground(backgroundColor);
+        messagePanel.repaint();
+        rightScroll.repaint();
     }
 
     public static void main(String[] args) {
@@ -115,12 +132,34 @@ class GraphCanvas extends JPanel {
     private Node sourceNode = null;
     private Node destinationNode = null;
     private int nodeCounter = 0;
-    private final Image bgImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/WORLD.jpg"))).getImage();
+    private Image bgImage;
+    private final Image worldImage;
+    private final Image paperImage;
+    private boolean isPaperView = false;
     private Node lastDeletedNode = null;
-    private List<Edge> lastDeletedEdges = new ArrayList<>();
+    private final List<Edge> lastDeletedEdges = new ArrayList<>();
+    private boolean isDirected = false;
 
     public GraphCanvas() {
-        setBackground(Color.WHITE); // Default to light mode
+        setBackground(Color.WHITE);
+        Image tempWorldImage = null;
+        Image tempPaperImage = null;
+        try {
+            tempWorldImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/WORLD.jpg"))).getImage();
+        } catch (NullPointerException e) {
+            System.err.println("Error: Could not load image /WORLD.jpg. Ensure the file is in the resources folder.");
+        }
+        try {
+            tempPaperImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/paper_view.jpg"))).getImage();
+        } catch (NullPointerException e) {
+            System.err.println("Error: Could not load image /paper_view.jpg. Ensure the file is in the resources folder.");
+        }
+        worldImage = tempWorldImage;
+        paperImage = tempPaperImage;
+        bgImage = worldImage != null ? worldImage : paperImage;
+        if (bgImage == null) {
+            System.err.println("Warning: Both images failed to load. Using default background.");
+        }
 
         addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) {
@@ -149,17 +188,20 @@ class GraphCanvas extends JPanel {
                         try {
                             int weight = Integer.parseInt(weightStr);
                             if (weight < 0) {
-                                JOptionPane.showMessageDialog(null, "Negative weights are not allowed in BFS.");
+                                JOptionPane.showMessageDialog(null, "Error: Negative weights are not allowed in BFS.");
                                 selectedForEdge = null;
                                 return;
                             }
                             edges.add(new Edge(selectedForEdge, clicked, weight));
+                            if (outputPanel != null) {
+//                                outputPanel.addMessage("Edge added: " + selectedForEdge.name + (isDirected ? " -> " : " <-> ") + clicked.name + " (weight: " + weight + ")");
+                            }
                         } catch (Exception ex) {
                             JOptionPane.showMessageDialog(null, "Invalid weight.");
                         }
                         selectedForEdge = null;
                     } else {
-                        JOptionPane.showMessageDialog(null, "Self-loops are not allowed.");
+                        JOptionPane.showMessageDialog(null, "Error: Self-loops are not allowed.");
                         selectedForEdge = null;
                     }
                 }
@@ -176,6 +218,13 @@ class GraphCanvas extends JPanel {
                 }
             }
         });
+    }
+
+    public void setDirected(boolean directed) {
+        System.out.println("Setting isDirected to: " + directed); // Debug output
+        this.isDirected = directed;
+        updateAdjacencyList();
+        repaint(); // Force repaint after changing direction
     }
 
     public void setOutputPanel(MessagePanel panel) {
@@ -201,7 +250,7 @@ class GraphCanvas extends JPanel {
         adjacencyList.clear();
         lastDeletedNode = null;
         lastDeletedEdges.clear();
-        nodeCounter = 0; // Reset nodeCounter to start labeling from 'A' again
+        nodeCounter = 0;
         if (outputPanel != null) outputPanel.clearMessages();
         repaint();
     }
@@ -257,6 +306,9 @@ class GraphCanvas extends JPanel {
     private void addNode(int x, int y) {
         String name = String.valueOf((char) ('A' + nodeCounter++));
         nodes.add(new Node(name, x, y));
+        if (outputPanel != null) {
+            outputPanel.addMessage("Node " + name + " added at (" + x + ", " + y + ")");
+        }
         repaint();
     }
 
@@ -309,7 +361,7 @@ class GraphCanvas extends JPanel {
 
             for (Edge edge : adjacencyList.getOrDefault(current.name, new ArrayList<>())) {
                 Node neighbor = getNodeByName(edge.to.name);
-                if (!visited.contains(neighbor)) {
+                if (neighbor != null && !visited.contains(neighbor)) {
                     visited.add(neighbor);
                     parent.put(neighbor, current);
                     queue.add(neighbor);
@@ -330,7 +382,9 @@ class GraphCanvas extends JPanel {
         adjacencyList.clear();
         for (Edge edge : edges) {
             adjacencyList.computeIfAbsent(edge.from.name, k -> new ArrayList<>()).add(new Edge(edge.from, edge.to, edge.weight));
-            adjacencyList.computeIfAbsent(edge.to.name, k -> new ArrayList<>()).add(new Edge(edge.to, edge.from, edge.weight));
+            if (!isDirected) {
+                adjacencyList.computeIfAbsent(edge.to.name, k -> new ArrayList<>()).add(new Edge(edge.to, edge.from, edge.weight));
+            }
         }
     }
 
@@ -347,9 +401,16 @@ class GraphCanvas extends JPanel {
             Node from = path.get(i);
             Node to = path.get(i + 1);
             for (Edge e : edges) {
-                if ((e.from.equals(from) && e.to.equals(to)) || (e.from.equals(to) && e.to.equals(from))) {
-                    pathEdges.add(e);
-                    break;
+                if (isDirected) {
+                    if (e.from.equals(from) && e.to.equals(to)) {
+                        pathEdges.add(e);
+                        break;
+                    }
+                } else {
+                    if ((e.from.equals(from) && e.to.equals(to)) || (e.from.equals(to) && e.to.equals(from))) {
+                        pathEdges.add(e);
+                        break;
+                    }
                 }
             }
         }
@@ -360,10 +421,25 @@ class GraphCanvas extends JPanel {
         repaint();
     }
 
+    public void toggleBackgroundImage() {
+        isPaperView = !isPaperView;
+        bgImage = isPaperView ? paperImage : worldImage;
+        if (outputPanel != null) {
+            outputPanel.setPaperView(isPaperView);
+        }
+        repaint();
+    }
+
+    public boolean isPaperView() {
+        return isPaperView;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+        if (bgImage != null) {
+            g.drawImage(bgImage, 0, 0, getWidth(), getHeight(), this);
+        }
 
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -373,11 +449,16 @@ class GraphCanvas extends JPanel {
             if (pathEdges.contains(e)) {
                 g2.setColor(Color.RED);
                 g2.setStroke(new BasicStroke(3));
+                System.out.println("Drawing path edge: " + e.from.name + " to " + e.to.name + " (Directed: " + isDirected + ")");
             } else {
                 g2.setColor(Color.BLACK);
                 g2.setStroke(new BasicStroke(2));
             }
-            g2.drawLine(e.from.x, e.from.y, e.to.x, e.to.y);
+            if (isDirected) {
+                drawArrowLine(g2, e.from.x, e.from.y, e.to.x, e.to.y, 10, 10);
+            } else {
+                g2.drawLine(e.from.x, e.from.y, e.to.x, e.to.y);
+            }
 
             int midX = (e.from.x + e.to.x) / 2;
             int midY = (e.from.y + e.to.y) / 2;
@@ -395,9 +476,9 @@ class GraphCanvas extends JPanel {
 
         for (Node n : nodes) {
             if (visitedNodes.contains(n)) {
-                g2.setColor(Color.ORANGE); // Nodes turn orange when visited
+                g2.setColor(Color.ORANGE);
             } else {
-                g2.setColor(Color.PINK); // Set node color to pink
+                g2.setColor(Color.PINK);
             }
             g2.fillOval(n.x - n.r, n.y - n.r, 2 * n.r, 2 * n.r);
 
@@ -428,6 +509,43 @@ class GraphCanvas extends JPanel {
         g2.setFont(new Font("Arial", Font.BOLD, 13));
         g2.drawString(label, x, y);
     }
+
+    private void drawArrowLine(Graphics2D g2, int x1, int y1, int x2, int y2, int d, int h) {
+        int dx = x2 - x1, dy = y2 - y1;
+        double D = Math.sqrt(dx * dx + dy * dy);
+        if (D == 0) return; // Avoid division by zero
+
+        // Normalize direction
+        double sin = dy / D, cos = dx / D;
+
+        // Adjust end point to avoid node overlap (20 pixels from node center)
+        double adjust = 20;
+        int endX = (int) (x1 + (dx * (D - adjust) / D));
+        int endY = (int) (y1 + (dy * (D - adjust) / D));
+
+        // Calculate arrowhead points relative to the end point, pointing back toward the line
+        double xm = -d * cos; // Move back along the line
+        double ym = -d * sin;
+        double xn = xm - h * sin; // Perpendicular to the line
+        double yn = ym + h * cos;
+
+        int arrowX1 = endX;
+        int arrowY1 = endY;
+        int arrowX2 = (int) (endX + xm - h * sin); // Second point
+        int arrowY2 = (int) (endY + ym + h * cos);
+        int arrowX3 = (int) (endX + xm + h * sin); // Third point
+        int arrowY3 = (int) (endY + ym - h * cos);
+
+        // Draw line
+        g2.drawLine(x1, y1, endX, endY);
+
+        // Draw arrowhead with debug color
+        g2.setColor(Color.GREEN); // Temporary debug color
+        g2.fillPolygon(new int[] {arrowX1, arrowX2, arrowX3}, new int[] {arrowY1, arrowY2, arrowY3}, 3);
+
+        // Reset color for subsequent drawings
+        g2.setColor(pathEdges.contains(new Edge(new Node("", x1, y1), new Node("", x2, y2), 0)) ? Color.RED : Color.BLACK);
+    }
 }
 
 class Node {
@@ -453,39 +571,49 @@ class Edge {
     }
 }
 
-// Updated class for custom message panel
 class MessagePanel extends JPanel {
-    private final List<String> messages = new ArrayList<>();
-    private static final Color DEFAULT_BORDER_COLOR = new Color(128, 0, 128); // Purple border
-    private static final Color PATH_FOUND_BORDER_COLOR = new Color(75, 0, 130); // Darker purple for "Best path found"
-    private static final int ARC_SIZE = 20; // Rounded corners
+    private final List<String> messages = new CopyOnWriteArrayList<>();
+    private static final Color DEFAULT_BORDER_COLOR = new Color(128, 0, 128);
+    private static final Color PATH_FOUND_BORDER_COLOR = new Color(75, 0, 130);
+    private static final Color PAPER_BORDER_COLOR = new Color(139, 69, 19);
+    private static final Color PAPER_PATH_FOUND_BORDER_COLOR = new Color(101, 67, 33);
+    private static final int ARC_SIZE = 20;
     private static final int MARGIN = 10;
+    private boolean isPaperView = false;
 
     public MessagePanel() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBackground(new Color(240, 240, 240));
+        setBackground(new Color(209, 230, 250));
+    }
+
+    public void setPaperView(boolean paperView) {
+        this.isPaperView = paperView;
+        setBackground(paperView ? new Color(210, 180, 140) : new Color(209, 230, 250));
+        repaint();
     }
 
     public void addMessage(String message) {
-        if (messages.isEmpty() || !isSimilarMessage(messages.get(messages.size() - 1), message)) {
-            messages.add(message);
-        } else {
-            // Append to the last message with a newline
-            int lastIndex = messages.size() - 1;
-            messages.set(lastIndex, messages.get(lastIndex) + "\n" + message);
-        }
-        repaint();
-        revalidate();
+        SwingUtilities.invokeLater(() -> {
+            if (messages.isEmpty() || !isSimilarMessage(messages.get(messages.size() - 1), message)) {
+                messages.add(message);
+            } else {
+                int lastIndex = messages.size() - 1;
+                messages.set(lastIndex, messages.get(lastIndex) + "\n" + message);
+            }
+            repaint();
+            revalidate();
+        });
     }
 
     public void clearMessages() {
-        messages.clear();
-        repaint();
-        revalidate();
+        SwingUtilities.invokeLater(() -> {
+            messages.clear();
+            repaint();
+            revalidate();
+        });
     }
 
     private boolean isSimilarMessage(String msg1, String msg2) {
-        // Check if messages start with the same prefix (e.g., "Visiting:", "Enqueueing:")
         String[] prefixes = {"Visiting:", "Enqueueing:"};
         for (String prefix : prefixes) {
             if (msg1.startsWith(prefix) && msg2.startsWith(prefix)) {
@@ -506,22 +634,20 @@ class MessagePanel extends JPanel {
         int lineHeight = fm.getHeight() + 10;
 
         for (String message : messages) {
-            int width = fm.stringWidth(message.replace("\n", " ")) + 40; // Account for longest line
+            int width = fm.stringWidth(message.replace("\n", " ")) + 40;
             int height = (message.split("\n").length * lineHeight) + 10;
 
-            // Determine border color based on message type
-            Color borderColor = message.startsWith("Best path found:") ? PATH_FOUND_BORDER_COLOR : DEFAULT_BORDER_COLOR;
+            Color borderColor = message.startsWith("Best path found:") ?
+                    (isPaperView ? PAPER_PATH_FOUND_BORDER_COLOR : PATH_FOUND_BORDER_COLOR) :
+                    (isPaperView ? PAPER_BORDER_COLOR : DEFAULT_BORDER_COLOR);
 
-            // Draw rounded rectangle with purple border
             g2.setColor(borderColor);
             g2.setStroke(new BasicStroke(2));
             g2.drawRoundRect(MARGIN, y, width, height, ARC_SIZE, ARC_SIZE);
 
-            // Fill with a light background
-            g2.setColor(new Color(230, 230, 250)); // Light lavender background
+            g2.setColor(new Color(230, 230, 250));
             g2.fillRoundRect(MARGIN + 1, y + 1, width - 2, height - 2, ARC_SIZE, ARC_SIZE);
 
-            // Draw the text with newlines
             g2.setColor(Color.BLACK);
             String[] lines = message.split("\n");
             for (int i = 0; i < lines.length; i++) {
@@ -537,7 +663,7 @@ class MessagePanel extends JPanel {
         FontMetrics fm = getFontMetrics(getFont());
         int maxWidth = 0;
         for (String message : messages) {
-            int width = fm.stringWidth(message.replace("\n", " ")) + 60; // Padding for longest line
+            int width = fm.stringWidth(message.replace("\n", " ")) + 60;
             maxWidth = Math.max(maxWidth, width);
         }
         return new Dimension(maxWidth, messages.size() * (fm.getHeight() + 20) + MARGIN);
