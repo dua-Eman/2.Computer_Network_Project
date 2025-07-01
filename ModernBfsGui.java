@@ -28,7 +28,7 @@ public class ModernBfsGui extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
         topPanel.setBackground(new Color(40, 40, 70));
 
         JLabel sourceLabel = new JLabel("Source:");
@@ -43,7 +43,38 @@ public class ModernBfsGui extends JFrame {
         JButton toggleViewBtn = new JButton("Paper View");
         JCheckBox directedGraphCheckBox = new JCheckBox("Directed Graph", false);
         directedGraphCheckBox.setToolTipText("Toggle between directed and undirected edges");
-        directedGraphCheckBox.setForeground(Color.black);
+        directedGraphCheckBox.setForeground(Color.BLACK);
+
+        // Apply consistent style to all buttons
+        bfsBtn.setBackground(new Color(60, 120, 180));
+        bfsBtn.setForeground(Color.WHITE);
+        bfsBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        bfsBtn.setFocusPainted(false);
+        bfsBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
+
+        resetBtn.setBackground(new Color(60, 120, 180));
+        resetBtn.setForeground(Color.WHITE);
+        resetBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        resetBtn.setFocusPainted(false);
+        resetBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
+
+        deleteNodeBtn.setBackground(new Color(60, 120, 180));
+        deleteNodeBtn.setForeground(Color.WHITE);
+        deleteNodeBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        deleteNodeBtn.setFocusPainted(false);
+        deleteNodeBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
+
+        undoBtn.setBackground(new Color(60, 120, 180));
+        undoBtn.setForeground(Color.WHITE);
+        undoBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        undoBtn.setFocusPainted(false);
+        undoBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
+
+        toggleViewBtn.setBackground(new Color(60, 120, 180));
+        toggleViewBtn.setForeground(Color.WHITE);
+        toggleViewBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        toggleViewBtn.setFocusPainted(false);
+        toggleViewBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
 
         topPanel.add(sourceLabel);
         topPanel.add(sourceField);
@@ -195,9 +226,6 @@ class GraphCanvas extends JPanel {
                                 return;
                             }
                             edges.add(new Edge(selectedForEdge, clicked, weight));
-                            if (outputPanel != null) {
-//                                outputPanel.addMessage("Edge added: " + selectedForEdge.name + (isDirected ? " -> " : " <-> ") + clicked.name + " (weight: " + weight + ")");
-                            }
                         } catch (Exception ex) {
                             JOptionPane.showMessageDialog(null, "Invalid weight.");
                         }
@@ -222,8 +250,7 @@ class GraphCanvas extends JPanel {
         });
     }
 
-    public void setDirected(boolean directed) {
-        System.out.println("Setting isDirected to: " + directed); // Debug output
+    public void setDirected(boolean directed) {// Debug output
         this.isDirected = directed;
         updateAdjacencyList();
         repaint(); // Force repaint after changing direction
@@ -309,7 +336,7 @@ class GraphCanvas extends JPanel {
         String name = String.valueOf((char) ('A' + nodeCounter++));
         nodes.add(new Node(name, x, y));
         if (outputPanel != null) {
-            outputPanel.addMessage("Node " + name + " added at (" + x + ", " + y + ")");
+            outputPanel.addMessage("Node " + name + " added.");
         }
         repaint();
     }
@@ -451,7 +478,6 @@ class GraphCanvas extends JPanel {
             if (pathEdges.contains(e)) {
                 g2.setColor(Color.RED);
                 g2.setStroke(new BasicStroke(3));
-                System.out.println("Drawing path edge: " + e.from.name + " to " + e.to.name + " (Directed: " + isDirected + ")");
             } else {
                 g2.setColor(Color.BLACK);
                 g2.setStroke(new BasicStroke(2));
@@ -531,8 +557,6 @@ class GraphCanvas extends JPanel {
         double xn = xm - h * sin; // Perpendicular to the line
         double yn = ym + h * cos;
 
-        int arrowX1 = endX;
-        int arrowY1 = endY;
         int arrowX2 = (int) (endX + xm - h * sin); // Second point
         int arrowY2 = (int) (endY + ym + h * cos);
         int arrowX3 = (int) (endX + xm + h * sin); // Third point
@@ -543,6 +567,8 @@ class GraphCanvas extends JPanel {
 
         // Draw arrowhead with debug color
         g2.setColor(Color.GREEN); // Temporary debug color
+        int arrowY1 = endY;
+        int arrowX1 = endX;
         g2.fillPolygon(new int[] {arrowX1, arrowX2, arrowX3}, new int[] {arrowY1, arrowY2, arrowY3}, 3);
 
         // Reset color for subsequent drawings
