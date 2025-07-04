@@ -28,13 +28,16 @@ public class ModernBfsGui extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 10));
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 25, 10));
         topPanel.setBackground(new Color(40, 40, 70));
 
         JLabel sourceLabel = new JLabel("Source:");
         sourceLabel.setForeground(Color.WHITE);
+        sourceLabel.setFont(new Font("Arial", Font.BOLD, 16));
+
         JLabel destLabel = new JLabel("Destination:");
         destLabel.setForeground(Color.WHITE);
+        destLabel.setFont(new Font("Arial", Font.BOLD, 16));
 
         JButton bfsBtn = new JButton("Start BFS");
         JButton resetBtn = new JButton("Reset Graph");
@@ -123,7 +126,7 @@ public class ModernBfsGui extends JFrame {
         directedGraphCheckBox.addActionListener(e -> canvas.setDirected(directedGraphCheckBox.isSelected()));
 
         // In ModernBfsGui constructor
-        Color lightSkyBlue = new Color(209, 230, 250);
+        Color lightSkyBlue = new Color(88, 187, 211);
         messagePanel.setBackground(lightSkyBlue);
         rightScroll = new JScrollPane(messagePanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         rightScroll.setPreferredSize(new Dimension(350, getHeight()));
@@ -133,13 +136,13 @@ public class ModernBfsGui extends JFrame {
 
         canvas.setOutputPanel(messagePanel);
 
-        add(topPanel, BorderLayout.NORTH);
+        add(topPanel, BorderLayout.SOUTH);
         add(rightScroll, BorderLayout.EAST);
         add(canvas, BorderLayout.CENTER);
     }
 
     private void updateMessagePanelColors() {
-        Color backgroundColor = canvas.isPaperView() ? new Color(210, 180, 140) : new Color(209, 230, 250);
+        Color backgroundColor = canvas.isPaperView() ? new Color(234, 223, 197) : new Color(69, 192, 216);
         messagePanel.setBackground(backgroundColor);
         rightScroll.setBackground(backgroundColor);
         rightScroll.getViewport().setBackground(backgroundColor);
@@ -220,8 +223,8 @@ class GraphCanvas extends JPanel {
                         String weightStr = JOptionPane.showInputDialog("Enter edge weight:");
                         try {
                             int weight = Integer.parseInt(weightStr);
-                            if (weight < 0) {
-                                JOptionPane.showMessageDialog(null, "Error: Negative weights are not allowed in BFS.");
+                            if (weight <= 0) {
+                                JOptionPane.showMessageDialog(null, "Error: Negative/empty weights are not allowed in BFS.");
                                 selectedForEdge = null;
                                 return;
                             }
@@ -250,10 +253,10 @@ class GraphCanvas extends JPanel {
         });
     }
 
-    public void setDirected(boolean directed) {// Debug output
+    public void setDirected(boolean directed) {
         this.isDirected = directed;
         updateAdjacencyList();
-        repaint(); // Force repaint after changing direction
+        repaint();
     }
 
     public void setOutputPanel(MessagePanel panel) {
@@ -498,7 +501,7 @@ class GraphCanvas extends JPanel {
 
             g2.setColor(Color.BLACK);
             g2.fillRect(midX - 3, midY - height + 5, width, height);
-            g2.setColor(Color.YELLOW);
+            g2.setColor(Color.WHITE);
             g2.drawString(weightStr, midX, midY);
         }
 
@@ -506,7 +509,7 @@ class GraphCanvas extends JPanel {
             if (visitedNodes.contains(n)) {
                 g2.setColor(Color.ORANGE);
             } else {
-                g2.setColor(Color.PINK);
+                g2.setColor(Color.WHITE);
             }
             g2.fillOval(n.x - n.r, n.y - n.r, 2 * n.r, 2 * n.r);
 
@@ -566,7 +569,7 @@ class GraphCanvas extends JPanel {
         g2.drawLine(x1, y1, endX, endY);
 
         // Draw arrowhead with debug color
-        g2.setColor(Color.GREEN); // Temporary debug color
+        g2.setColor(Color.BLACK); // Temporary debug color
         int arrowY1 = endY;
         int arrowX1 = endX;
         g2.fillPolygon(new int[] {arrowX1, arrowX2, arrowX3}, new int[] {arrowY1, arrowY2, arrowY3}, 3);
@@ -601,8 +604,8 @@ class Edge {
 
 class MessagePanel extends JPanel {
     private final List<String> messages = new CopyOnWriteArrayList<>();
-    private static final Color DEFAULT_BORDER_COLOR = new Color(128, 0, 128);
-    private static final Color PATH_FOUND_BORDER_COLOR = new Color(75, 0, 130);
+    private static final Color DEFAULT_BORDER_COLOR = new Color(14, 81, 119);
+    private static final Color PATH_FOUND_BORDER_COLOR = new Color(42, 75, 218);
     private static final Color PAPER_BORDER_COLOR = new Color(139, 69, 19);
     private static final Color PAPER_PATH_FOUND_BORDER_COLOR = new Color(101, 67, 33);
     private static final int ARC_SIZE = 20;
@@ -612,12 +615,12 @@ class MessagePanel extends JPanel {
 
     public MessagePanel() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBackground(new Color(209, 230, 250));
+        setBackground(new Color(0, 188, 212));
     }
 
     public void setPaperView(boolean paperView) {
         this.isPaperView = paperView;
-        setBackground(paperView ? new Color(210, 180, 140) : new Color(209, 230, 250));
+        setBackground(paperView ? new Color(210, 180, 140) : new Color(0, 188, 212));
         repaint();
     }
 
@@ -680,17 +683,27 @@ class MessagePanel extends JPanel {
             int width = maxWidth + 40;
             int height = (lines.length * lineHeight) + PADDING;
 
+            // Beautiful gradient border
             Color borderColor = message.startsWith("Best path found:") ?
                     (isPaperView ? PAPER_PATH_FOUND_BORDER_COLOR : PATH_FOUND_BORDER_COLOR) :
                     (isPaperView ? PAPER_BORDER_COLOR : DEFAULT_BORDER_COLOR);
+            GradientPaint gradient = new GradientPaint(
+                    MARGIN, y, borderColor,
+                    MARGIN + width, y + height, Color.BLACK, true
+            );
+            g2.setPaint(gradient);
+            g2.setStroke(new BasicStroke(4));
+            g2.drawRoundRect(MARGIN - 2, y - 2, width + 4, height + 4, ARC_SIZE + 4, ARC_SIZE + 4);
 
-            g2.setColor(borderColor);
-            g2.setStroke(new BasicStroke(2));
-            g2.drawRoundRect(MARGIN, y, width, height, ARC_SIZE, ARC_SIZE);
+            // Subtle shadow effect
+            g2.setColor(new Color(0, 0, 0, 50));
+            g2.fillRoundRect(MARGIN + 2, y + 2, width, height, ARC_SIZE, ARC_SIZE);
 
-            g2.setColor(new Color(230, 230, 250));
-            g2.fillRoundRect(MARGIN + 1, y + 1, width - 2, height - 2, ARC_SIZE, ARC_SIZE);
+            // Inner background
+            g2.setColor(new Color(255, 255, 255));
+            g2.fillRoundRect(MARGIN, y, width, height, ARC_SIZE, ARC_SIZE);
 
+            // Message text
             g2.setColor(Color.BLACK);
             for (int i = 0; i < lines.length; i++) {
                 g2.drawString(lines[i], MARGIN + 20, y + (i + 1) * lineHeight - 5);
