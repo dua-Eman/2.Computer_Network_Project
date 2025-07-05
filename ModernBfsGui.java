@@ -1,3 +1,4 @@
+
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.awt.*;
 import java.awt.event.*;
@@ -42,6 +43,7 @@ public class ModernBfsGui extends JFrame {
         JButton bfsBtn = new JButton("Start BFS");
         JButton resetBtn = new JButton("Reset Graph");
         JButton deleteNodeBtn = new JButton("Delete Node");
+        JButton deleteEdgeBtn = new JButton("Delete Edge");
         JButton undoBtn = new JButton("Undo");
         JButton toggleViewBtn = new JButton("Paper View");
         JCheckBox directedGraphCheckBox = new JCheckBox("Directed Graph", false);
@@ -67,6 +69,12 @@ public class ModernBfsGui extends JFrame {
         deleteNodeBtn.setFocusPainted(false);
         deleteNodeBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
 
+        deleteEdgeBtn.setBackground(new Color(60, 120, 180));
+        deleteEdgeBtn.setForeground(Color.WHITE);
+        deleteEdgeBtn.setFont(new Font("Arial", Font.BOLD, 15));
+        deleteEdgeBtn.setFocusPainted(false);
+        deleteEdgeBtn.setBorder(BorderFactory.createLineBorder(new Color(80, 140, 200), 2));
+
         undoBtn.setBackground(new Color(60, 120, 180));
         undoBtn.setForeground(Color.WHITE);
         undoBtn.setFont(new Font("Arial", Font.BOLD, 15));
@@ -86,6 +94,7 @@ public class ModernBfsGui extends JFrame {
         topPanel.add(bfsBtn);
         topPanel.add(resetBtn);
         topPanel.add(deleteNodeBtn);
+        topPanel.add(deleteEdgeBtn);
         topPanel.add(undoBtn);
         topPanel.add(toggleViewBtn);
         topPanel.add(directedGraphCheckBox);
@@ -112,6 +121,13 @@ public class ModernBfsGui extends JFrame {
             String nodeName = JOptionPane.showInputDialog("Enter node name to delete:");
             if (nodeName != null && !nodeName.trim().isEmpty()) {
                 canvas.deleteNode(nodeName.trim());
+            }
+        });
+
+        deleteEdgeBtn.addActionListener(e -> {
+            String edgeInput = JOptionPane.showInputDialog("Enter edge to delete (e.g., A to C):");
+            if (edgeInput != null && !edgeInput.trim().isEmpty()) {
+                canvas.deleteEdge(edgeInput.trim());
             }
         });
 
@@ -172,7 +188,7 @@ class GraphCanvas extends JPanel {
     private final Image worldImage;
     private final Image paperImage;
     private boolean isPaperView = false;
-    private Node lastDeletedNode = null;
+    private Object lastDeleted = null; // Tracks the last deleted item (Node or Edge)
     private final List<Edge> lastDeletedEdges = new ArrayList<>();
     private boolean isDirected = false;
 
@@ -280,7 +296,7 @@ class GraphCanvas extends JPanel {
         visitedNodes.clear();
         pathEdges.clear();
         adjacencyList.clear();
-        lastDeletedNode = null;
+        lastDeleted = null;
         lastDeletedEdges.clear();
         nodeCounter = 0;
         if (outputPanel != null) outputPanel.clearMessages();
@@ -294,7 +310,7 @@ class GraphCanvas extends JPanel {
             return;
         }
 
-        lastDeletedNode = nodeToDelete;
+        lastDeleted = nodeToDelete;
         lastDeletedEdges.clear();
         for (Edge e : edges) {
             if (e.from == nodeToDelete || e.to == nodeToDelete) {
@@ -316,23 +332,78 @@ class GraphCanvas extends JPanel {
         repaint();
     }
 
-    public void undoDelete() {
-        if (lastDeletedNode == null) {
-            JOptionPane.showMessageDialog(null, "No node deletion to undo.", "Info", JOptionPane.INFORMATION_MESSAGE);
+    public void deleteEdge(String edgeInput) {
+        String[] edgeParts = edgeInput.split("\\s+to\\s+");
+        if (edgeParts.length != 2) {
+            JOptionPane.showMessageDialog(null, "Invalid edge format. Use 'source to destination' (e.g., A to C).", "Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        nodes.add(lastDeletedNode);
-        edges.addAll(lastDeletedEdges);
+        String fromName = edgeParts[0].trim();
+        String toName = edgeParts[1].trim();
+        Node fromNode = getNodeByName(fromName);
+        Node toNode = getNodeByName(toName);
+
+        if (fromNode == null || toNode == null) {
+            JOptionPane.showMessageDialog(null, "One or both nodes (" + fromName + ", " + toName + ") not found.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        boolean edgeFound = false;
+        List<Edge> edgesToRemove = new ArrayList<>();
+        for (Edge e : edges) {
+            if (e.from == fromNode && e.to == toNode) {
+                edgesToRemove.add(e);
+                edgeFound = true;
+            } else if (!isDirected && e.from == toNode && e.to == fromNode) {
+                edgesToRemove.add(e);
+                edgeFound = true;
+            }
+        }
+
+        if (!edgeFound) {
+            JOptionPane.showMessageDialog(null, "Edge from " + fromName + " to " + toName + " not found.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        lastDeleted = edgesToRemove.get(0); // Store the first edge as the last deleted item
+        lastDeletedEdges.clear();
+        lastDeletedEdges.addAll(edgesToRemove);
+        edges.removeAll(edgesToRemove);
         updateAdjacencyList();
 
         if (outputPanel != null) {
-            outputPanel.addMessage("Undo: Restored node " + lastDeletedNode.name + " and its edges.");
+            outputPanel.addMessage("Edge " + fromName + (isDirected ? " -> " : " <-> ") + toName + " deleted.");
         }
         repaint();
+    }
 
-        lastDeletedNode = null;
+    public void undoDelete() {
+        if (lastDeleted == null) {
+            JOptionPane.showMessageDialog(null, "No deletion to undo.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        if (lastDeleted instanceof Node) {
+            Node nodeToRestore = (Node) lastDeleted;
+            nodes.add(nodeToRestore);
+            edges.addAll(lastDeletedEdges);
+            updateAdjacencyList();
+            if (outputPanel != null) {
+                outputPanel.addMessage("Undo: Restored node " + nodeToRestore.name + " and its edges.");
+            }
+        } else if (lastDeleted instanceof Edge) {
+            edges.addAll(lastDeletedEdges);
+            updateAdjacencyList();
+            if (outputPanel != null) {
+                Edge edge = (Edge) lastDeleted;
+                outputPanel.addMessage("Undo: Restored edge " + edge.from.name + (isDirected ? " -> " : " <-> ") + edge.to.name + ".");
+            }
+        }
+
+        lastDeleted = null;
         lastDeletedEdges.clear();
+        repaint();
     }
 
     private void addNode(int x, int y) {
