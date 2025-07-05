@@ -100,8 +100,8 @@ public class ModernBfsGui extends JFrame {
         topPanel.add(directedGraphCheckBox);
 
         bfsBtn.addActionListener(e -> {
-            String src = sourceField.getText().trim();
-            String dst = destField.getText().trim();
+            String src = sourceField.getText().trim().toUpperCase();
+            String dst = destField.getText().trim().toUpperCase();
             if (src.isEmpty() || dst.isEmpty()) {
                 JOptionPane.showMessageDialog(null, "Please enter both source and destination nodes.", "Input Error", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -120,14 +120,20 @@ public class ModernBfsGui extends JFrame {
         deleteNodeBtn.addActionListener(e -> {
             String nodeName = JOptionPane.showInputDialog("Enter node name to delete:");
             if (nodeName != null && !nodeName.trim().isEmpty()) {
-                canvas.deleteNode(nodeName.trim());
+                canvas.deleteNode(nodeName.trim().toUpperCase());
+            }
+            if(Objects.requireNonNull(nodeName).isEmpty()){
+                JOptionPane.showMessageDialog(null, "Invalid Node.");
             }
         });
 
         deleteEdgeBtn.addActionListener(e -> {
             String edgeInput = JOptionPane.showInputDialog("Enter edge to delete (e.g., A to C):");
             if (edgeInput != null && !edgeInput.trim().isEmpty()) {
-                canvas.deleteEdge(edgeInput.trim());
+                canvas.deleteEdge(edgeInput.trim().toLowerCase());
+            }
+            if(Objects.requireNonNull(edgeInput).isEmpty()){
+                JOptionPane.showMessageDialog(null, "Invalid Edge.");
             }
         });
 
