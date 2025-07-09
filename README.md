@@ -78,7 +78,7 @@ None! This app only uses standard Java libraries:
 ### Option 1: Run via GitHub Release (JAR)
 
 1. Go to the **Releases section**:
-   👉 [Download Latest Release](https://github.com/your-username/your-repo-name/releases/latest)
+   👉 [Download Latest Release](https://github.com/dua-Eman/2.Computer_Network_Project/releases/tag/v1.0)
 
 2. Download the `.jar` file
 
