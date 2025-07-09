@@ -22,6 +22,11 @@ This project simulates basic network routing algorithms using Java in IntelliJ. 
 
 ---
 
+## Releases
+
+Download & Run
+You can download the latest runnable JAR file from the GitHub Releases section.
+
 ## Folder Structure
 
 Structure the project as follows:
@@ -35,8 +40,6 @@ BfsVisualizerX/
 │   ├── Node.java                 // Node class
 │   ├── Edge.java                 // Edge class
 │   └── Messageconsole.java        // Log display panel
-│
-├── resources/
 │   ├── WORLD.jpg                 // Background image (World map)
 │   └── paper_view.jpg           // Background image (Paper look)
 │
@@ -62,6 +65,7 @@ If running from IDE (IntelliJ), ensure:
 ## External Dependencies
 
 None! This app only uses standard Java libraries:
+- 'JDK 17 or above'
 - `javax.swing.*`
 - `java.awt.*`
 - `java.util.*`
@@ -71,16 +75,27 @@ None! This app only uses standard Java libraries:
 
 ## How to Compile and Run
 
-### Step 1: Compile all files
+### Option 1: Run via GitHub Release (JAR)
 
-If you are using **command line**:
+1. Go to the **Releases section**:
+   👉 [Download Latest Release](https://github.com/your-username/your-repo-name/releases/latest)
 
- compile in your IDE (select all files and Run).
+2. Download the `.jar` file
 
-### Step 2: Run the app
+3. Run it using:
+   ```bash
+   java -jar BFS_GUI.jar
 
-in your IDE, right-click `BFS_GUI.java` → `Run`.
 
+### Option 2: Run from Source Code
+1. Clone the repository:
+      git clone https://github.com/your-username/your-repo-name.git
+   
+2. Open the project in IntelliJ IDEA
+
+3. Set the main class to BFS_GUI.java
+
+4. Build and run the project
 ---
 
 ## How to Use the App
@@ -125,5 +140,5 @@ You canScroll it. Messages are color-coded and stylized for clarity.
 
 ---
 
-## Made by Dua Eman Rabia ejaz, Anila khan
+## Academic assignment made by Dua Eman Rabia ejaz, Anila khan
 
